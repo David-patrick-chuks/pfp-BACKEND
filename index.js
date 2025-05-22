@@ -136,14 +136,29 @@ app.get("/", (req, res) => {
 });
 
 // Get community gallery
+
 app.get("/api/gallery", async (req, res) => {
   try {
-    const items = await GalleryItem.find().sort({ id: -1 });
-    res.json(items);
+    // Get page and limit from query params, default to page 1 and limit 5
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5;
+    const skip = (page - 1) * limit;
+
+    // Get total count of gallery items
+    const total = await GalleryItem.countDocuments();
+
+    // Get paginated items sorted by id descending
+    const items = await GalleryItem.find()
+      .sort({ id: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({ total, items });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
