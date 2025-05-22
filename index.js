@@ -194,11 +194,11 @@ async function applyWatermark(imagePath, logoPath, outputPath) {
 app.post("/api/generate-image", async (req, res) => {
   const { username, inscription, hatColor, gender, description, customColor } = req.body;
 
-  const prompt = `
+ const prompt = `
 Stylized Cartoon Avatar Featuring a Trucker Hat with a Custom Inscription
 
 Overview:
-Generate a high-quality, digitally aesthetic profile picture (PFP) of a stylized cartoon avatar, wearing a trucker hat that prominently displays the inscription "${inscription}". The avatar must embody a modern, vibrant cartoon stylization with a playful vibe, avoiding any hyper-realistic human features. Incorporate the following personalized attributes:
+Generate a high-quality, digitally aesthetic profile picture (PFP) of a stylized cartoon avatar, wearing a trucker hat that prominently displays the inscription "${inscription}". The avatar must embody a modern, vibrant cartoon stylization with a playful vibe, avoiding any hyper-realistic human features. Ensure the avatar clearly reflects the specified gender "${gender}" through distinct visual traits. Introduce variety in the avatar's appearance to ensure each generated image is visually distinct while maintaining the specified style. Incorporate the following personalized attributes:
 - Hat Inscription: "${inscription}"
 - Hat Color: ${hatColor}
 - Gender: ${gender}
@@ -206,21 +206,39 @@ Generate a high-quality, digitally aesthetic profile picture (PFP) of a stylized
 
 Avatar Specifications:
 
-Art Style: Stylized cartoon avatar with vibrant colors, bold outlines, and exaggerated features typical of high-quality cartoon PFPs (e.g., similar to modern NFT avatars or anime-inspired characters). The avatar must have a distinctly animated, non-human appearance with clean lines, simplified textures, and a whimsical vibe suitable for a lighthearted audience.
+Art Style: Stylized cartoon avatar with vibrant colors, bold outlines, and exaggerated features typical of high-quality cartoon PFPs (e.g., similar to modern NFT avatars or anime-inspired characters). The avatar must have a distinctly animated, non-human appearance with clean lines, simplified textures, and a whimsical vibe suitable for a lighthearted audience. Ensure each generated avatar has unique characteristics to avoid repetition in appearance.
 
-Expression: Shy and slightly embarrassed, featuring a small, closed-mouth smile, wide eyes with a hint of nervousness, and cartoon-style sweat drops near the face to convey a playful, apologetic mood.
+Gender Representation:
+- If Gender is "female": Emphasize traditionally feminine traits such as softer facial features (e.g., larger eyes with longer lashes, rounded jawline), and more delicate styling in hair and clothing (e.g., bows, frilled clothing edges). Use brighter or pastel color palettes where appropriate.
+- If Gender is "male": Emphasize traditionally masculine traits such as sharper facial features (e.g., angular jawline, smaller eyes with thicker eyebrows), and more rugged styling in hair and clothing (e.g., short hair, bolder patterns). Use darker or more neutral color palettes where appropriate.
+- If Gender is "neutral": Use a balanced mix of features, avoiding overly feminine or masculine traits (e.g., medium-sized eyes, neutral jawline, unisex clothing styles). Use a versatile color palette that avoids strong gender stereotypes.
+- Ensure the specified gender "${gender}" is clearly reflected in the avatar's design through these visual cues.
 
-Eyes: Large, stylized black eyes with thick outlines, bold white highlights, and a shiny, animated look to emphasize the cartoon aesthetic. Add a slight til t to the eyes to enhance the shy expression.
+Expression: Randomize the expression to convey a playful mood. Options include: shy and slightly embarrassed (small, closed-mouth smile, wide eyes with a hint of nervousness, cartoon-style sweat drops), cheerful (big smile, sparkling eyes), or mischievous (smirking with one eye winking). Ensure the expression aligns with the playful vibe and complements the specified gender.
 
-Hair: Medium-length, stylized black hair tied into two pigtails, with a smooth, playful design that enhances the cartoon style, using bold highlights and simplified shading. The pigtails should be symmetrical and slightly voluminous.
+Eyes: Large, stylized eyes with thick outlines, bold white highlights, and a shiny, animated look to emphasize the cartoon aesthetic. Randomize the eye color between black, brown, blue, or green, and adjust the eye shape slightly (e.g., rounded for female, almond-shaped for male, or neutral for non-binary) to reflect the gender and enhance the chosen expression.
 
-Skin Tone: Pale complexion with smooth, vibrant cartoon shading (e.g., flat colors with subtle gradients), featuring cartoon-style sweat drops and a small cross-shaped mark on the cheek for a quirky, playful appearance.
+Hair: Randomize the hair style and color for variety, while aligning with the specified gender. 
+- For "female": Options include two pigtails, a single ponytail, loose wavy hair, or long bangs, with colors like black, brown, blonde, pink, or purple.
+- For "male": Options include short spiky hair, a side part, or a short messy cut, with colors like black, brown, blonde, blue, or green.
+- For "neutral": Options include a medium-length bob, tousled hair, or a single braid, with colors like black, brown, blonde, teal, or silver.
+- Ensure the hair design enhances the cartoon style, uses bold highlights, simplified shading, and varies between generations.
 
-Clothing: Modern, dark-colored collared shirt (e.g., black) in a simplified cartoon design with bold outlines, minimal texture details, and a casual look tailored for a whimsical, approachable character.
+Skin Tone: Randomize the skin tone between pale, medium, or tan complexion, using smooth, vibrant cartoon shading (e.g., flat colors with subtle gradients). Add a quirky detail like a small cross-shaped mark, freckles, or a star-shaped mark on the cheek for a playful appearance, ensuring it aligns with the gender (e.g., star for female, freckles for male, cross for neutral).
+
+Clothing: Randomize the clothing style while keeping it modern and casual in a simplified cartoon design with bold outlines and minimal texture details, reflecting the specified gender.
+- For "female": Options include a dark-colored collared shirt with frilled edges, a graphic tee with a floral pattern, or a pastel hoodie (e.g., pink, lavender).
+- For "male": Options include a dark-colored collared shirt with a bold stripe, a graphic tee with a geometric pattern, or a rugged hoodie (e.g., navy, green).
+- For "neutral": Options include a simple collared shirt, a graphic tee with a minimalist design, or a hoodie in a neutral color (e.g., gray, white).
+- Ensure the clothing aligns with a whimsical, approachable character and varies between generations.
 
 Accessories:
 - Hat: Trucker-style cap in ${hatColor}, featuring a mesh back and a prominent front panel. The inscription "${inscription}" must be displayed in its entirety on the front panel in a bold, legible, black font. Ensure the text is clear, undistorted, and fully visible, occupying the majority of the front panel without truncation or distortion.
-- Safety Pin: A cartoon-style safety pin accessory on the side of the head, near one of the pigtails, with a simplified design and bold outlines to enhance the quirky aesthetic.
+- Random Accessory: Include one randomized accessory to add variety, aligning with the gender. 
+  - For "female": Options include a cartoon-style safety pin near the hair, small star-shaped earrings, or a tiny bow on the hair.
+  - For "male": Options include a small stud earring, a wristband, or a tiny scarf around the neck.
+  - For "neutral": Options include a simple choker necklace, a minimalist pin on the shirt, or a hair clip.
+  - Use simplified designs and bold outlines to enhance the quirky aesthetic.
 
 Background:
 - Solid black backdrop with minimal digital glitch effects and faint, floating pixel particles in soft sky-blue (#5CEFFF) tones to evoke a modern, digital aesthetic.
@@ -228,10 +246,11 @@ Background:
 
 Critical Requirements:
 - The avatar must be a stylized cartoon with exaggerated, animated features (e.g., large eyes, bold outlines, vibrant colors), explicitly avoiding any hyper-realistic human traits such as photorealistic skin textures or lifelike proportions.
-- Use a style similar to modern NFT avatars or anime-inspired characters to ensure a distinctly cartoonish appearance.
+- Use a style similar to modern NFT avatars or anime-inspired characters to ensure a distinctly cartoonish appearance, but ensure each avatar is visually distinct by randomizing features like hair, expression, clothing, and accessories.
 - The hat inscription must exactly match "${inscription}", displayed prominently and legibly on the trucker hat’s front panel with no truncation, distortion, or partial rendering.
 - Exclude any additional logos, characters, or text beyond the specified inscription.
 - Ensure the composition prioritizes the avatar’s face and hat, with the background enhancing but not overpowering the subject.
+- Ensure the avatar's gender "${gender}" is accurately represented through clear visual cues in facial features, hair, clothing, and accessories.
 `.trim();
 
   let filePath, watermarkedFilePath;
