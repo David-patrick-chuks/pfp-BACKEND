@@ -8,6 +8,7 @@ const cloudinary = require("cloudinary").v2;
 const { v4: uuidv4 } = require("uuid");
 const fs = require("fs/promises");
 const path = require("path");
+const sharp = require("sharp"); // Add sharp
 
 dotenv.config();
 const app = express();
@@ -53,6 +54,8 @@ const GalleryItemSchema = new mongoose.Schema({
 const GalleryItem = mongoose.model("GalleryItem", GalleryItemSchema);
 
 // Image generation and saving route
+
+// Image generation and saving route
 app.post("/api/generate-image", async (req, res) => {
   const { username, inscription, hatColor, gender, description, customColor } = req.body;
 
@@ -80,6 +83,7 @@ app.post("/api/generate-image", async (req, res) => {
   };
 
   try {
+    // Generate image with Gemini API
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:predict?key=${GEMINI_API_KEY}`,
       payload,
@@ -97,14 +101,50 @@ app.post("/api/generate-image", async (req, res) => {
     const filePath = path.join(__dirname, fileName);
     await fs.writeFile(filePath, buffer);
 
-    // Upload to Cloudinary
-    const uploadResult = await cloudinary.uploader.upload(filePath, {
+    // Add Zule logo watermark using sharp
+    const logoPath = path.join(__dirname, 'watermark_logo.png'); // Adjust path to your logo
+    const watermarkedFileName = `watermarked_${fileName}`;
+    const watermarkedFilePath = path.join(__dirname, watermarkedFileName);
+
+    // Load the generated image and logo with sharp
+    const image = sharp(filePath);
+    const { width, height } = await image.metadata();
+    const logo = sharp(logoPath);
+    const logoMetadata = await logo.metadata();
+
+    // Calculate logo width as 10% of image width, preserve aspect ratio
+    const targetLogoWidth = Math.round(width * 0.1); // 10% of image width
+    const targetLogoHeight = Math.round((targetLogoWidth / logoMetadata.width) * logoMetadata.height); // Maintain aspect ratio
+
+    // Resize logo
+    const resizedLogo = await logo
+      .resize(targetLogoWidth, targetLogoHeight, {
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 } // Transparent background
+      })
+      .toBuffer();
+
+    // Overlay logo in top-right corner with padding
+    const padding = 10;
+    await image
+      .composite([
+        {
+          input: resizedLogo,
+          top: padding,
+          left: width - targetLogoWidth - padding,
+        },
+      ])
+      .toFile(watermarkedFilePath);
+
+    // Upload watermarked image to Cloudinary
+    const uploadResult = await cloudinary.uploader.upload(watermarkedFilePath, {
       folder: "zule-pfps",
-      public_id: path.parse(fileName).name,
+      public_id: path.parse(watermarkedFileName).name,
     });
 
-    // Cleanup temp file
+    // Cleanup temporary files
     await fs.unlink(filePath);
+    await fs.unlink(watermarkedFilePath);
 
     // Save to MongoDB
     const lastItem = await GalleryItem.findOne().sort({ id: -1 });
@@ -119,15 +159,14 @@ app.post("/api/generate-image", async (req, res) => {
 
     res.json({
       imageUrl: uploadResult.secure_url,
-      message: "Image generated and saved.",
+      message: "Image generated, watermarked, and saved.",
       galleryItem: newItem,
     });
   } catch (err) {
     console.error("❌ Error:", err.response?.data || err.message);
-    res.status(500).json({ error: "Failed to generate or save image." });
+    res.status(500).json({ error: "Failed to generate, watermark, or save image." });
   }
 });
-
 // Root endpoint
 app.get("/", (req, res) => {
     console.log("API accessed");
