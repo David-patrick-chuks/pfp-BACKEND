@@ -17,6 +17,7 @@ const allowedOrigins = [
   "https://pfp.zuleai.xyz",
   "https://www.zuleai.xyz",
   "https://zuleai.xyz",
+  "https://pfp-gbxgpnv6c-david-patricks-projects.vercel.app"
 ];
 
 app.use(
