@@ -78,16 +78,45 @@ app.post("/api/generate-image", async (req, res) => {
   const { username, inscription, hatColor, gender, description, customColor } =
     req.body;
 
-  const prompt = `
-    Create a cartoon-style profile picture (PFP) for a user.
-    - Username: ${username}
-    - Inscription: ${inscription}
-    - Hat color: ${hatColor || "default"}
-    - Gender: ${gender || "neutral"}
-    - Theme color: ${customColor || "#5CEFFF"}
-    - Description: ${description || "A crypto raider repping ZULE"}
-    Make it stylish and digitally aesthetic.
-  `;
+  const prompt  = `
+Realistic Anime Character with Trucker Hat Promoting $ZULE Token
+
+Overall Description:
+Create a high-quality PFP of a friendly, stylish young adult with natural, lifelike features, wearing a trucker hat that promotes the $ZULE token. The character should feel digitally aesthetic and vibe with crypto culture. Include the following personalizations:
+- Hat Inscription: "${inscription}"
+- Hat Color: ${hatColor || "default"}
+- Gender: ${gender || "neutral"}
+- Theme Color: ${customColor || "#5CEFFF"}
+- Description: ${description || "A crypto raider repping ZULE"}
+
+Character Details:
+
+Art Style: Realistic anime portrait with natural skin textures and soft lighting, capturing subtle human expressions and stylish personality.
+
+Expression: Confident and approachable, with a warm, genuine smile and inviting eyes.
+
+Eyes: Detailed brown or black eyes with reflective highlights.
+
+Hair: Medium-length, styled casually (light brown or black), can be loose or tied back naturally.
+
+Skin Tone: Medium to fair complexion with soft blush and subtle features like freckles or beauty marks.
+
+Clothing: Dark-colored collared shirt, casual and modern, suitable for street-style or a chill meetup.
+
+Accessories:
+- Hat: Trucker-style cap in ${hatColor || "blue and white"}, mesh back, with front panel showing: "${inscription}" in bold, clear font (black preferred).
+- Small accessory optional (e.g., pin, bracelet) to add a personal touch.
+
+Background:
+- Smooth black backdrop with subtle digital glitch effects and floating pixel dust in soft sky-blue tones.
+- Keep the focus on the character. Subtle modern-crypto feel.
+
+Critical Guidelines:
+- Style must remain consistent and photorealistic with digital anime influences.
+- Hat text must be **exactly**: "${inscription}"
+- No extra logos, characters, or text outside the prompt specs.
+`.trim();
+
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   const MODEL_ID = "models/imagen-3.0-generate-002";
@@ -248,7 +277,7 @@ app.get("/", (req, res) => {
 app.get("/api/gallery", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 10;
+    const limit = 10
     const skip = (page - 1) * limit;
 
     const total = await GalleryItem.countDocuments();
