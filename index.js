@@ -13,27 +13,32 @@ const sharp = require("sharp");
 dotenv.config();
 const app = express();
 const allowedOrigins = [
-  'https://pfp-zule.vercel.app',
-  'https://pfp.zuleai.xyz'
+  "https://pfp-zule.vercel.app",
+  "https://pfp.zuleai.xyz",
+  "https://zuleai.xyz",
+  "https://www.zuleai.xyz",
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  }
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+  })
+);
 
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {})
+mongoose
+  .connect(process.env.MONGO_URI, {})
   .then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.error("❌ MongoDB Error:", err));
+  .catch((err) => console.error("❌ MongoDB Error:", err));
 
 // Cloudinary config
 cloudinary.config({
@@ -59,7 +64,7 @@ const NewsletterSchema = new mongoose.Schema({
     unique: true, // Prevent duplicate emails
     trim: true,
     lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'], // Basic email validation
+    match: [/^\S+@\S+\.\S+$/, "Please enter a valid email address"], // Basic email validation
   },
   subscribedAt: {
     type: Date,
@@ -70,7 +75,8 @@ const Newsletter = mongoose.model("Newsletter", NewsletterSchema);
 
 // Image generation and saving route
 app.post("/api/generate-image", async (req, res) => {
-  const { username, inscription, hatColor, gender, description, customColor } = req.body;
+  const { username, inscription, hatColor, gender, description, customColor } =
+    req.body;
 
   const prompt = `
     Create a cartoon-style profile picture (PFP) for a user.
@@ -84,14 +90,14 @@ app.post("/api/generate-image", async (req, res) => {
   `;
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  const MODEL_ID = 'models/imagen-3.0-generate-002';
+  const MODEL_ID = "models/imagen-3.0-generate-002";
 
   const payload = {
     instances: [{ prompt }],
     parameters: {
       sampleCount: 1,
-      personGeneration: 'ALLOW_ADULT',
-      aspectRatio: '1:1',
+      personGeneration: "ALLOW_ADULT",
+      aspectRatio: "1:1",
     },
   };
 
@@ -99,7 +105,7 @@ app.post("/api/generate-image", async (req, res) => {
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:predict?key=${GEMINI_API_KEY}`,
       payload,
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { "Content-Type": "application/json" } }
     );
 
     const base64Data = response.data?.predictions?.[0]?.bytesBase64Encoded;
@@ -107,12 +113,12 @@ app.post("/api/generate-image", async (req, res) => {
       return res.status(500).json({ error: "No image returned from Gemini." });
     }
 
-    const buffer = Buffer.from(base64Data, 'base64');
+    const buffer = Buffer.from(base64Data, "base64");
     const fileName = `generated_image_${uuidv4()}.png`;
     const filePath = path.join(__dirname, fileName);
     await fs.writeFile(filePath, buffer);
 
-    const logoPath = path.join(__dirname, 'watermark_logo.png');
+    const logoPath = path.join(__dirname, "watermark_logo.png");
     const watermarkedFileName = `watermarked_${fileName}`;
     const watermarkedFilePath = path.join(__dirname, watermarkedFileName);
 
@@ -131,12 +137,14 @@ app.post("/api/generate-image", async (req, res) => {
 
     const maxLogoWidth = 50;
     const targetLogoWidth = Math.min(Math.round(width * 0.1), maxLogoWidth);
-    const targetLogoHeight = Math.round((targetLogoWidth / logoMetadata.width) * logoMetadata.height);
+    const targetLogoHeight = Math.round(
+      (targetLogoWidth / logoMetadata.width) * logoMetadata.height
+    );
 
     const resizedLogo = await logo
       .resize(targetLogoWidth, targetLogoHeight, {
-        fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 }
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
       .toBuffer();
 
@@ -147,7 +155,7 @@ app.post("/api/generate-image", async (req, res) => {
           input: resizedLogo,
           top: padding,
           left: Math.max(0, width - targetLogoWidth - padding),
-          blend: 'over',
+          blend: "over",
           opacity: 0.7,
         },
       ])
@@ -188,7 +196,9 @@ app.post("/api/generate-image", async (req, res) => {
     } catch (cleanupErr) {
       console.error("❌ Cleanup Error:", cleanupErr.message);
     }
-    res.status(500).json({ error: "Failed to generate, watermark, or save image." });
+    res
+      .status(500)
+      .json({ error: "Failed to generate, watermark, or save image." });
   }
 });
 
@@ -201,19 +211,27 @@ app.post("/api/newsletter", async (req, res) => {
     return res.status(400).json({ error: "Email is required." });
   }
   if (!/^\S+@\S+\.\S+$/.test(email)) {
-    return res.status(400).json({ error: "Please enter a valid email address." });
+    return res
+      .status(400)
+      .json({ error: "Please enter a valid email address." });
   }
 
   try {
     // Check if email already exists
-    const existingSubscription = await Newsletter.findOne({ email: email.toLowerCase() });
+    const existingSubscription = await Newsletter.findOne({
+      email: email.toLowerCase(),
+    });
     if (existingSubscription) {
-      return res.status(409).json({ error: "This email is already subscribed." });
+      return res
+        .status(409)
+        .json({ error: "This email is already subscribed." });
     }
 
     // Create new subscription
     const newSubscription = await Newsletter.create({ email });
-    res.status(201).json({ message: "Successfully subscribed to the newsletter!" });
+    res
+      .status(201)
+      .json({ message: "Successfully subscribed to the newsletter!" });
   } catch (err) {
     console.error("❌ Newsletter Error:", err.message);
     res.status(500).json({ error: "Failed to subscribe. Please try again." });
