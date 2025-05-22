@@ -73,83 +73,182 @@ const NewsletterSchema = new mongoose.Schema({
 });
 const Newsletter = mongoose.model("Newsletter", NewsletterSchema);
 
-// Image generation and saving route
-app.post("/api/generate-image", async (req, res) => {
-  const { username, inscription, hatColor, gender, description, customColor } =
-    req.body;
-
-  const prompt  = `
-Realistic Anime Character with Trucker Hat Promoting $ZULE Token
-
-Overall Description:
-Create a high-quality PFP of a friendly, stylish young adult with natural, lifelike features, wearing a trucker hat that promotes the $ZULE token. The character should feel digitally aesthetic and vibe with crypto culture. Include the following personalizations:
-- Hat Inscription: "${inscription}"
-- Hat Color: ${hatColor || "default"}
-- Gender: ${gender || "neutral"}
-- Theme Color: ${customColor || "#5CEFFF"}
-- Description: ${description || "A crypto raider repping ZULE"}
-
-Character Details:
-
-Art Style: Realistic anime portrait with natural skin textures and soft lighting, capturing subtle human expressions and stylish personality.
-
-Expression: Confident and approachable, with a warm, genuine smile and inviting eyes.
-
-Eyes: Detailed brown or black eyes with reflective highlights.
-
-Hair: Medium-length, styled casually (light brown or black), can be loose or tied back naturally.
-
-Skin Tone: Medium to fair complexion with soft blush and subtle features like freckles or beauty marks.
-
-Clothing: Dark-colored collared shirt, casual and modern, suitable for street-style or a chill meetup.
-
-Accessories:
-- Hat: Trucker-style cap in ${hatColor || "blue and white"}, mesh back, with front panel showing: "${inscription}" in bold, clear font (black preferred).
-- Small accessory optional (e.g., pin, bracelet) to add a personal touch.
-
-Background:
-- Smooth black backdrop with subtle digital glitch effects and floating pixel dust in soft sky-blue tones.
-- Keep the focus on the character. Subtle modern-crypto feel.
-
-Critical Guidelines:
-- Style must remain consistent and photorealistic with digital anime influences.
-- Hat text must be **exactly**: "${inscription}"
-- No extra logos, characters, or text outside the prompt specs.
-`.trim();
 
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Initialize API keys from environment variables
+const geminiApiKeys = [];
+let keyIndex = 1;
+while (process.env[`GEMINI_API_KEY_${keyIndex}`]) {
+  geminiApiKeys.push(process.env[`GEMINI_API_KEY_${keyIndex}`]);
+  keyIndex++;
+}
+
+let currentApiKeyIndex = 0; // Keeps track of the current Gemini API key in use
+let geminiApiKey = geminiApiKeys[currentApiKeyIndex];
+let currentApiKeyName = `GEMINI_API_KEY_${currentApiKeyIndex + 1}`;
+
+// Function to get the next API key (circular rotation)
+function getNextApiKey() {
+  currentApiKeyIndex = (currentApiKeyIndex + 1) % geminiApiKeys.length;
+  geminiApiKey = geminiApiKeys[currentApiKeyIndex];
+  currentApiKeyName = `GEMINI_API_KEY_${currentApiKeyIndex + 1}`;
+  return geminiApiKey;
+}
+
+// Function to generate the image with recursive retry logic
+async function generateImage(prompt, retries, maxRetries) {
+  retries = retries || 0;
+  maxRetries = maxRetries || geminiApiKeys.length * 2;
   const MODEL_ID = "models/imagen-3.0-generate-002";
 
-  const payload = {
-    instances: [{ prompt }],
-    parameters: {
-      sampleCount: 1,
-      personGeneration: "ALLOW_ADULT",
-      aspectRatio: "1:1",
-    },
-  };
+  if (!geminiApiKey) {
+    console.error("No Gemini API key available.");
+    throw new Error("No API key available.");
+  }
+
+  if (retries >= maxRetries) {
+    console.error("Max retries reached. Unable to generate image.");
+    throw new Error("Max retries reached. Unable to generate image.");
+  }
 
   try {
+    console.info(`Using ${currentApiKeyName} to generate image...`);
+
+    const payload = {
+      instances: [{ prompt: prompt }],
+      parameters: {
+        sampleCount: 1,
+        personGeneration: "ALLOW_ADULT",
+        aspectRatio: "1:1",
+      },
+    };
+
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:predict?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:predict?key=${geminiApiKey}`,
       payload,
       { headers: { "Content-Type": "application/json" } }
     );
 
     const base64Data = response.data?.predictions?.[0]?.bytesBase64Encoded;
     if (!base64Data) {
-      return res.status(500).json({ error: "No image returned from Gemini." });
+      throw new Error("No image returned from Gemini.");
     }
 
-    const buffer = Buffer.from(base64Data, "base64");
-    const fileName = `generated_image_${uuidv4()}.png`;
-    const filePath = path.join(__dirname, fileName);
-    await fs.writeFile(filePath, buffer);
+    return Buffer.from(base64Data, "base64");
 
+  } catch (error) {
+    if (error.response && error.response.status === 429) {
+      console.error(`---${currentApiKeyName} limit exhausted (429), switching to the next API key...`);
+      getNextApiKey();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+      return generateImage(prompt, retries + 1, maxRetries);
+    } else if (error.response && error.response.status === 503) {
+      console.error(`Service unavailable (503) with ${currentApiKeyName}. Retrying after delay...`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5-second delay
+      getNextApiKey();
+      return generateImage(prompt, retries + 1, maxRetries);
+    } else {
+      console.error(`Error generating image with ${currentApiKeyName}: ${error.message}`);
+      throw error;
+    }
+  }
+}
+
+// Function to apply watermark (with 2x size increase)
+async function applyWatermark(imagePath, logoPath, outputPath) {
+  const image = sharp(imagePath);
+  const { width, height } = await image.metadata();
+  const logo = sharp(logoPath);
+  const logoMetadata = await logo.metadata();
+
+  const maxLogoWidth = 100; // Doubled from 50 to 100 (2x)
+  const targetLogoWidth = Math.min(Math.round(width * 0.4), maxLogoWidth); // Already adjusted to 0.4 (2x from 0.2)
+  const targetLogoHeight = Math.round(
+    (targetLogoWidth / logoMetadata.width) * logoMetadata.height
+  );
+
+  const resizedLogo = await logo
+    .resize(targetLogoWidth, targetLogoHeight, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .toBuffer();
+
+  const padding = 10;
+  await image
+    .composite([
+      {
+        input: resizedLogo,
+        top: padding,
+        left: Math.max(0, width - targetLogoWidth - padding),
+        blend: "over",
+        opacity: 0.7,
+      },
+    ])
+    .toFile(outputPath);
+
+  return outputPath;
+}
+
+// Express route for generating the image
+app.post("/api/generate-image", async (req, res) => {
+  const { username, inscription, hatColor, gender, description, customColor } = req.body;
+
+  const prompt = `
+Stylized Cartoon Avatar Featuring a Trucker Hat with a Custom Inscription
+
+Overview:
+Generate a high-quality, digitally aesthetic profile picture (PFP) of a stylized cartoon avatar, wearing a trucker hat that prominently displays the inscription "${inscription}". The avatar must embody a modern, vibrant cartoon stylization with a playful vibe, avoiding any hyper-realistic human features. Incorporate the following personalized attributes:
+- Hat Inscription: "${inscription}"
+- Hat Color: ${hatColor}
+- Gender: ${gender}
+- Description: ${description}
+
+Avatar Specifications:
+
+Art Style: Stylized cartoon avatar with vibrant colors, bold outlines, and exaggerated features typical of high-quality cartoon PFPs (e.g., similar to modern NFT avatars or anime-inspired characters). The avatar must have a distinctly animated, non-human appearance with clean lines, simplified textures, and a whimsical vibe suitable for a lighthearted audience.
+
+Expression: Shy and slightly embarrassed, featuring a small, closed-mouth smile, wide eyes with a hint of nervousness, and cartoon-style sweat drops near the face to convey a playful, apologetic mood.
+
+Eyes: Large, stylized black eyes with thick outlines, bold white highlights, and a shiny, animated look to emphasize the cartoon aesthetic. Add a slight til t to the eyes to enhance the shy expression.
+
+Hair: Medium-length, stylized black hair tied into two pigtails, with a smooth, playful design that enhances the cartoon style, using bold highlights and simplified shading. The pigtails should be symmetrical and slightly voluminous.
+
+Skin Tone: Pale complexion with smooth, vibrant cartoon shading (e.g., flat colors with subtle gradients), featuring cartoon-style sweat drops and a small cross-shaped mark on the cheek for a quirky, playful appearance.
+
+Clothing: Modern, dark-colored collared shirt (e.g., black) in a simplified cartoon design with bold outlines, minimal texture details, and a casual look tailored for a whimsical, approachable character.
+
+Accessories:
+- Hat: Trucker-style cap in ${hatColor}, featuring a mesh back and a prominent front panel. The inscription "${inscription}" must be displayed in its entirety on the front panel in a bold, legible, black font. Ensure the text is clear, undistorted, and fully visible, occupying the majority of the front panel without truncation or distortion.
+- Safety Pin: A cartoon-style safety pin accessory on the side of the head, near one of the pigtails, with a simplified design and bold outlines to enhance the quirky aesthetic.
+
+Background:
+- Solid black backdrop with minimal digital glitch effects and faint, floating pixel particles in soft sky-blue (#5CEFFF) tones to evoke a modern, digital aesthetic.
+- Ensure the background remains understated, keeping the avatar as the focal point without distracting from the character or hat.
+
+Critical Requirements:
+- The avatar must be a stylized cartoon with exaggerated, animated features (e.g., large eyes, bold outlines, vibrant colors), explicitly avoiding any hyper-realistic human traits such as photorealistic skin textures or lifelike proportions.
+- Use a style similar to modern NFT avatars or anime-inspired characters to ensure a distinctly cartoonish appearance.
+- The hat inscription must exactly match "${inscription}", displayed prominently and legibly on the trucker hat’s front panel with no truncation, distortion, or partial rendering.
+- Exclude any additional logos, characters, or text beyond the specified inscription.
+- Ensure the composition prioritizes the avatar’s face and hat, with the background enhancing but not overpowering the subject.
+`.trim();
+
+  let filePath, watermarkedFilePath;
+
+  try {
+    // Generate the image using the recursive function
+    const imageBuffer = await generateImage(prompt);
+
+    // Save the generated image
+    const fileName = `generated_image_${uuidv4()}.png`;
+    filePath = path.join(__dirname, fileName);
+    await fs.writeFile(filePath, imageBuffer);
+
+    // Apply watermark
     const logoPath = path.join(__dirname, "watermark_logo.png");
     const watermarkedFileName = `watermarked_${fileName}`;
-    const watermarkedFilePath = path.join(__dirname, watermarkedFileName);
+    watermarkedFilePath = path.join(__dirname, watermarkedFileName);
 
     try {
       await fs.access(logoPath);
@@ -159,42 +258,15 @@ Critical Guidelines:
       return res.status(500).json({ error: "Logo file not found." });
     }
 
-    const image = sharp(filePath);
-    const { width, height } = await image.metadata();
-    const logo = sharp(logoPath);
-    const logoMetadata = await logo.metadata();
+    await applyWatermark(filePath, logoPath, watermarkedFilePath);
 
-    const maxLogoWidth = 50;
-    const targetLogoWidth = Math.min(Math.round(width * 0.1), maxLogoWidth);
-    const targetLogoHeight = Math.round(
-      (targetLogoWidth / logoMetadata.width) * logoMetadata.height
-    );
-
-    const resizedLogo = await logo
-      .resize(targetLogoWidth, targetLogoHeight, {
-        fit: "contain",
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      })
-      .toBuffer();
-
-    const padding = 10;
-    await image
-      .composite([
-        {
-          input: resizedLogo,
-          top: padding,
-          left: Math.max(0, width - targetLogoWidth - padding),
-          blend: "over",
-          opacity: 0.7,
-        },
-      ])
-      .toFile(watermarkedFilePath);
-
+    // Upload to Cloudinary
     const uploadResult = await cloudinary.uploader.upload(watermarkedFilePath, {
       folder: "zule-pfps",
       public_id: path.parse(watermarkedFileName).name,
     });
 
+    // Clean up local files
     try {
       await fs.unlink(filePath);
       await fs.unlink(watermarkedFilePath);
@@ -202,13 +274,14 @@ Critical Guidelines:
       console.error("❌ Cleanup Error:", cleanupErr.message);
     }
 
+    // Save to database
     const lastItem = await GalleryItem.findOne().sort({ id: -1 });
     const nextId = lastItem ? lastItem.id + 1 : 1;
 
     const newItem = await GalleryItem.create({
       id: nextId,
-      username,
-      inscription,
+      username: username,
+      inscription: inscription,
       imageUrl: uploadResult.secure_url,
     });
 
@@ -217,17 +290,16 @@ Critical Guidelines:
       message: "Image generated, watermarked, and saved.",
       galleryItem: newItem,
     });
+
   } catch (err) {
-    console.error("❌ Error:", err.response?.data || err.message);
+    console.error("❌ Error:", err.message);
     try {
-      await fs.unlink(filePath).catch(() => {});
-      await fs.unlink(watermarkedFilePath).catch(() => {});
+      if (filePath) await fs.unlink(filePath);
+      if (watermarkedFilePath) await fs.unlink(watermarkedFilePath);
     } catch (cleanupErr) {
       console.error("❌ Cleanup Error:", cleanupErr.message);
     }
-    res
-      .status(500)
-      .json({ error: "Failed to generate, watermark, or save image." });
+    res.status(500).json({ error: "Failed to generate, watermark, or save image." });
   }
 });
 
