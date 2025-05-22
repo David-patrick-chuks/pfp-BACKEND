@@ -195,7 +195,7 @@ async function applyWatermark(imagePath, logoPath, outputPath) {
 app.post("/api/generate-image", async (req, res) => {
   const { username, inscription, hatColor, gender, description, customColor } = req.body;
 
- const prompt = `
+const prompt = `
 Stylized Cartoon Avatar Featuring a Trucker Hat with a Custom Inscription
 
 Overview:
@@ -234,7 +234,7 @@ Clothing: Randomize the clothing style while keeping it modern and casual in a s
 - Ensure the clothing aligns with a whimsical, approachable character and varies between generations.
 
 Accessories:
-- Hat: Trucker-style cap in ${hatColor}, featuring a mesh back and a prominent front panel. The inscription "${inscription}" must be displayed in its entirety on the front panel in a bold, legible, black font. Ensure the text is clear, undistorted, and fully visible, occupying the majority of the front panel without truncation or distortion.
+- Hat: Trucker-style cap in ${hatColor}, featuring a mesh back and a prominent front panel. The inscription "${inscription}" must be displayed in its entirety on the front panel in a bold, legible font. Use a high-contrast color (e.g., black font for light hats, white font for dark hats) to ensure readability. Adjust the font size dynamically to fit the entire inscription without truncation, distortion, or partial rendering. If the inscription is longer than 10 characters, wrap the text across multiple lines (up to 2 lines) to ensure all characters are visible, maintaining even spacing and centering the text on the front panel. For example, an inscription like "PUMP ZULLE NOW" should be fully displayed, potentially as "PUMP ZULLE" on the first line and "NOW" on the second line, depending on length. Ensure the text occupies the majority of the front panel, is clear, and remains undistorted regardless of the inscription length.
 - Random Accessory: Include one randomized accessory to add variety, aligning with the gender. 
   - For "female": Options include a cartoon-style safety pin near the hair, small star-shaped earrings, or a tiny bow on the hair.
   - For "male": Options include a small stud earring, a wristband, or a tiny scarf around the neck.
@@ -248,7 +248,7 @@ Background:
 Critical Requirements:
 - The avatar must be a stylized cartoon with exaggerated, animated features (e.g., large eyes, bold outlines, vibrant colors), explicitly avoiding any hyper-realistic human traits such as photorealistic skin textures or lifelike proportions.
 - Use a style similar to modern NFT avatars or anime-inspired characters to ensure a distinctly cartoonish appearance, but ensure each avatar is visually distinct by randomizing features like hair, expression, clothing, and accessories.
-- The hat inscription must exactly match "${inscription}", displayed prominently and legibly on the trucker hat’s front panel with no truncation, distortion, or partial rendering.
+- The hat inscription must exactly match "${inscription}" in its entirety, displayed prominently and legibly on the trucker hat’s front panel with no truncation, distortion, or partial rendering. For longer inscriptions, wrap the text across multiple lines as needed to ensure full visibility.
 - Exclude any additional logos, characters, or text beyond the specified inscription.
 - Ensure the composition prioritizes the avatar’s face and hat, with the background enhancing but not overpowering the subject.
 - Ensure the avatar's gender "${gender}" is accurately represented through clear visual cues in facial features, hair, clothing, and accessories.
