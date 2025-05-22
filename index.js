@@ -180,7 +180,7 @@ app.get("/api/gallery", async (req, res) => {
   try {
     // Get page and limit from query params, default to page 1 and limit 5
     const page = parseInt(req.query.page) || 1;
-    const limit = 5;
+    const limit = 10;
     const skip = (page - 1) * limit;
 
     // Get total count of gallery items
