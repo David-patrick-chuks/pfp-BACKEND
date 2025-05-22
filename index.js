@@ -15,8 +15,8 @@ const app = express();
 const allowedOrigins = [
   "https://pfp-zule.vercel.app",
   "https://pfp.zuleai.xyz",
-  "https://zuleai.xyz",
   "https://www.zuleai.xyz",
+  "https://zuleai.xyz",
 ];
 
 app.use(
