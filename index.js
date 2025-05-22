@@ -8,7 +8,7 @@ const cloudinary = require("cloudinary").v2;
 const { v4: uuidv4 } = require("uuid");
 const fs = require("fs/promises");
 const path = require("path");
-const sharp = require("sharp"); // Add sharp
+const sharp = require("sharp");
 
 dotenv.config();
 const app = express();
@@ -19,7 +19,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like curl, Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
@@ -32,9 +31,8 @@ app.use(cors({
 app.use(express.json());
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
-
-}).then(() => console.log("✅ MongoDB Connected"))
+mongoose.connect(process.env.MONGO_URI, {})
+  .then(() => console.log("✅ MongoDB Connected"))
   .catch(err => console.error("❌ MongoDB Error:", err));
 
 // Cloudinary config
@@ -44,7 +42,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Mongoose schema
+// Mongoose schemas
 const GalleryItemSchema = new mongoose.Schema({
   id: Number,
   username: String,
@@ -53,7 +51,22 @@ const GalleryItemSchema = new mongoose.Schema({
 });
 const GalleryItem = mongoose.model("GalleryItem", GalleryItemSchema);
 
-// Image generation and saving route
+// Newsletter subscription schema
+const NewsletterSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true, // Prevent duplicate emails
+    trim: true,
+    lowercase: true,
+    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'], // Basic email validation
+  },
+  subscribedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+const Newsletter = mongoose.model("Newsletter", NewsletterSchema);
 
 // Image generation and saving route
 app.post("/api/generate-image", async (req, res) => {
@@ -83,7 +96,6 @@ app.post("/api/generate-image", async (req, res) => {
   };
 
   try {
-    // Generate image with Gemini API
     const response = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/${MODEL_ID}:predict?key=${GEMINI_API_KEY}`,
       payload,
@@ -95,58 +107,64 @@ app.post("/api/generate-image", async (req, res) => {
       return res.status(500).json({ error: "No image returned from Gemini." });
     }
 
-    // Save image temporarily
     const buffer = Buffer.from(base64Data, 'base64');
     const fileName = `generated_image_${uuidv4()}.png`;
     const filePath = path.join(__dirname, fileName);
     await fs.writeFile(filePath, buffer);
 
-    // Add Zule logo watermark using sharp
-    const logoPath = path.join(__dirname, 'watermark_logo.png'); // Adjust path to your logo
+    const logoPath = path.join(__dirname, 'watermark_logo.png');
     const watermarkedFileName = `watermarked_${fileName}`;
     const watermarkedFilePath = path.join(__dirname, watermarkedFileName);
 
-    // Load the generated image and logo with sharp
+    try {
+      await fs.access(logoPath);
+    } catch (err) {
+      console.error("❌ Logo file not found:", logoPath);
+      await fs.unlink(filePath).catch(() => {});
+      return res.status(500).json({ error: "Logo file not found." });
+    }
+
     const image = sharp(filePath);
     const { width, height } = await image.metadata();
     const logo = sharp(logoPath);
     const logoMetadata = await logo.metadata();
 
-    // Calculate logo width as 10% of image width, preserve aspect ratio
-    const targetLogoWidth = Math.round(width * 0.1); // 10% of image width
-    const targetLogoHeight = Math.round((targetLogoWidth / logoMetadata.width) * logoMetadata.height); // Maintain aspect ratio
+    const maxLogoWidth = 50;
+    const targetLogoWidth = Math.min(Math.round(width * 0.1), maxLogoWidth);
+    const targetLogoHeight = Math.round((targetLogoWidth / logoMetadata.width) * logoMetadata.height);
 
-    // Resize logo
     const resizedLogo = await logo
       .resize(targetLogoWidth, targetLogoHeight, {
         fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 } // Transparent background
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
       .toBuffer();
 
-    // Overlay logo in top-right corner with padding
     const padding = 10;
     await image
       .composite([
         {
           input: resizedLogo,
           top: padding,
-          left: width - targetLogoWidth - padding,
+          left: Math.max(0, width - targetLogoWidth - padding),
+          blend: 'over',
+          opacity: 0.7,
         },
       ])
       .toFile(watermarkedFilePath);
 
-    // Upload watermarked image to Cloudinary
     const uploadResult = await cloudinary.uploader.upload(watermarkedFilePath, {
       folder: "zule-pfps",
       public_id: path.parse(watermarkedFileName).name,
     });
 
-    // Cleanup temporary files
-    await fs.unlink(filePath);
-    await fs.unlink(watermarkedFilePath);
+    try {
+      await fs.unlink(filePath);
+      await fs.unlink(watermarkedFilePath);
+    } catch (cleanupErr) {
+      console.error("❌ Cleanup Error:", cleanupErr.message);
+    }
 
-    // Save to MongoDB
     const lastItem = await GalleryItem.findOne().sort({ id: -1 });
     const nextId = lastItem ? lastItem.id + 1 : 1;
 
@@ -164,29 +182,58 @@ app.post("/api/generate-image", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error:", err.response?.data || err.message);
+    try {
+      await fs.unlink(filePath).catch(() => {});
+      await fs.unlink(watermarkedFilePath).catch(() => {});
+    } catch (cleanupErr) {
+      console.error("❌ Cleanup Error:", cleanupErr.message);
+    }
     res.status(500).json({ error: "Failed to generate, watermark, or save image." });
   }
 });
+
+// Newsletter subscription route
+app.post("/api/newsletter", async (req, res) => {
+  const { email } = req.body;
+
+  // Basic validation
+  if (!email) {
+    return res.status(400).json({ error: "Email is required." });
+  }
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: "Please enter a valid email address." });
+  }
+
+  try {
+    // Check if email already exists
+    const existingSubscription = await Newsletter.findOne({ email: email.toLowerCase() });
+    if (existingSubscription) {
+      return res.status(409).json({ error: "This email is already subscribed." });
+    }
+
+    // Create new subscription
+    const newSubscription = await Newsletter.create({ email });
+    res.status(201).json({ message: "Successfully subscribed to the newsletter!" });
+  } catch (err) {
+    console.error("❌ Newsletter Error:", err.message);
+    res.status(500).json({ error: "Failed to subscribe. Please try again." });
+  }
+});
+
 // Root endpoint
 app.get("/", (req, res) => {
-    console.log("API accessed");
-    // Log the request method and URL
+  console.log("API accessed");
   res.send("Welcome to the ZULE PFP image generation API!");
 });
 
 // Get community gallery
-
 app.get("/api/gallery", async (req, res) => {
   try {
-    // Get page and limit from query params, default to page 1 and limit 5
     const page = parseInt(req.query.page) || 1;
     const limit = 10;
     const skip = (page - 1) * limit;
 
-    // Get total count of gallery items
     const total = await GalleryItem.countDocuments();
-
-    // Get paginated items sorted by id descending
     const items = await GalleryItem.find()
       .sort({ id: -1 })
       .skip(skip)
@@ -197,7 +244,6 @@ app.get("/api/gallery", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
