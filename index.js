@@ -130,6 +130,8 @@ app.post("/api/generate-image", async (req, res) => {
 
 // Root endpoint
 app.get("/", (req, res) => {
+    console.log("API accessed");
+    // Log the request method and URL
   res.send("Welcome to the ZULE PFP image generation API!");
 });
 
