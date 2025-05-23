@@ -74,7 +74,14 @@ const NewsletterSchema = new mongoose.Schema({
 });
 const Newsletter = mongoose.model("Newsletter", NewsletterSchema);
 
-
+// Function to shuffle an array (Fisher-Yates shuffle)
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+  }
+  return array;
+}
 
 // Initialize API keys from environment variables
 const geminiApiKeys = [];
@@ -84,9 +91,11 @@ while (process.env[`GEMINI_API_KEY_${keyIndex}`]) {
   keyIndex++;
 }
 
+// Shuffle the API keys array to start with a random key
+const shuffledApiKeys = shuffleArray([...geminiApiKeys]); // Create a copy and shuffle
 let currentApiKeyIndex = 0; // Keeps track of the current Gemini API key in use
-let geminiApiKey = geminiApiKeys[currentApiKeyIndex];
-let currentApiKeyName = `GEMINI_API_KEY_${currentApiKeyIndex + 1}`;
+let geminiApiKey = shuffledApiKeys[currentApiKeyIndex];
+let currentApiKeyName = `GEMINI_API_KEY_${geminiApiKeys.indexOf(geminiApiKey) + 1}`;
 
 // Function to get the next API key (circular rotation)
 function getNextApiKey() {
@@ -97,9 +106,7 @@ function getNextApiKey() {
 }
 
 // Function to generate the image with recursive retry logic
-async function generateImage(prompt, retries, maxRetries) {
-  retries = retries || 0;
-  maxRetries = maxRetries || geminiApiKeys.length * 2;
+async function generateImage(prompt, retries = 0, maxRetries = geminiApiKeys.length * 2) {
   const MODEL_ID = "models/imagen-3.0-generate-002";
 
   if (!geminiApiKey) {
@@ -132,7 +139,10 @@ async function generateImage(prompt, retries, maxRetries) {
 
     const base64Data = response.data?.predictions?.[0]?.bytesBase64Encoded;
     if (!base64Data) {
-      throw new Error("No image returned from Gemini.");
+      console.error(`No image returned from Gemini with ${currentApiKeyName}. Retrying...`);
+      getNextApiKey();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+      return generateImage(prompt, retries + 1, maxRetries);
     }
 
     return Buffer.from(base64Data, "base64");
@@ -150,7 +160,9 @@ async function generateImage(prompt, retries, maxRetries) {
       return generateImage(prompt, retries + 1, maxRetries);
     } else {
       console.error(`Error generating image with ${currentApiKeyName}: ${error.message}`);
-      throw error;
+      getNextApiKey();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+      return generateImage(prompt, retries + 1, maxRetries);
     }
   }
 }
@@ -366,17 +378,34 @@ app.get("/", (req, res) => {
 });
 
 // Get community gallery
+
 app.get("/api/gallery", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 10
+    const limit = 10;
     const skip = (page - 1) * limit;
 
-    const total = await GalleryItem.countDocuments();
-    const items = await GalleryItem.find()
-      .sort({ id: -1 })
-      .skip(skip)
-      .limit(limit);
+    // Use aggregation to remove duplicates based on username
+    const total = await GalleryItem.aggregate([
+      { $match: { username: { $exists: true, $ne: null } } }, // Ensure username exists
+      { $group: { _id: "$username", count: { $sum: 1 } } }, // Group by username
+      { $count: "total" }, // Count unique usernames
+    ]).then(result => result[0]?.total || 0); // Extract total or default to 0
+
+    // Fetch unique items, keeping the first occurrence of each username
+    const items = await GalleryItem.aggregate([
+      { $match: { username: { $exists: true, $ne: null } } }, // Ensure username exists
+      { $sort: { id: -1 } }, // Sort by id descending
+      { $group: { 
+          _id: "$username", 
+          doc: { $first: "$$ROOT" } // Keep the first document for each username
+        }
+      },
+      { $replaceRoot: { newRoot: "$doc" } }, // Replace root with the document
+      { $sort: { id: -1 } }, // Re-sort by id after grouping
+      { $skip: skip }, // Apply pagination
+      { $limit: limit }, // Limit results
+    ]);
 
     res.json({ total, items });
   } catch (err) {

@@ -58,12 +58,13 @@ async function dropAllDatabasesWithMongoose(uri) {
 }
 
 // Example usage
-// (async () => {
-//   try {
-//     const uri =
-//       "mongodb+srv://pd3072894:5drZWpuq9YNQMSXj@cluster0.5rrseq1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-//     await dropAllDatabasesWithMongoose(uri);
-//   } catch (error) {
-//     console.error("Failed to drop databases:", error.message);
-//   }
-// })();
+(async () => {
+  try {
+    const uri =
+      // "mongodb+srv://pd3072894:5drZWpuq9YNQMSXj@cluster0.5rrseq1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+      "mongodb+srv://pd3072894:2yHZdEg6b99VsSV8@cluster0.p6k6pqf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    await dropAllDatabasesWithMongoose(uri);
+  } catch (error) {
+    console.error("Failed to drop databases:", error.message);
+  }
+})();
