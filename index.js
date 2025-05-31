@@ -412,6 +412,9 @@ app.get("/api/gallery", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch gallery." });
   }
 });
+app.get("/ping", async (req, res) => {
+  res.status(200).json({ message: "ZULE to the fucking moon 🌕" });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
