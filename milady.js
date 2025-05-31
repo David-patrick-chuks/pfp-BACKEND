@@ -18,7 +18,7 @@ const allowedOrigins = [
   "https://zuleai.xyz",
   "https://pfp.zuleai.xyz/",
   "https://pfp-gbxgpnv6c-david-patricks-projects.vercel.app",
-  "https://pfp-zule.vercel.app",
+  "https://pfp-zule.vercel.app"
 ];
 
 app.use(
@@ -204,67 +204,71 @@ async function applyWatermark(imagePath, logoPath, outputPath) {
   return outputPath;
 }
 
+
+
 // Express route for generating the image
 app.post("/api/generate-image", async (req, res) => {
-  const { username, inscription, hatColor, gender, description, customColor } = req.body;
+  const { username, traits } = req.body; // Collect JSON traits from client
 
-const prompt = `
-Stylized Cartoon Avatar Featuring a Trucker Hat with a Custom Inscription
+  // Validate traits input
+  if (!traits || !Array.isArray(traits)) {
+    return res.status(400).json({ error: "Invalid or missing traits array." });
+  }
 
-Overview:
-Generate a high-quality, digitally aesthetic profile picture (PFP) of a stylized cartoon avatar, wearing a trucker hat that prominently displays the inscription "${inscription}". The avatar must embody a modern, vibrant cartoon stylization with a playful vibe, avoiding any hyper-realistic human features. Ensure the avatar clearly reflects the specified gender "${gender}" through distinct visual traits. Introduce variety in the avatar's appearance to ensure each generated image is visually distinct while maintaining the specified style. Incorporate the following personalized attributes:
-- Hat Inscription: "${inscription}"
-- Hat Color: ${hatColor}
-- Gender: ${gender}
-- Description: ${description}
+  // Construct the prompt from traits
+  let prompt = `
+You are an AI art generator specializing in creating digital characters in the style of Milady and Remilio NFTs. These characters are chibi-style with a blocky, low-poly, hand-drawn sketch aesthetic, featuring large expressive anime-like eyes, simple facial features, and a prominent retro glitch effect. The style should resemble a rough, artist sketch with visible pencil or digital sketch lines, avoiding smooth 3D renders or polished cartoon looks. Use vibrant colors, exaggerated accessories, and a mix of cute and edgy traits. Your task is to generate a character based on the following JSON traits, ensuring each trait is accurately represented with the Milady/Remilio sketch aesthetic.
 
-Avatar Specifications:
+1. **Base Character Design:**
+   - Create a chibi-style character with a blocky, low-poly body and a large head, drawn with rough sketch lines.
+   - Use large, shiny anime-style eyes with small pupils, simple eyebrows, and a minimalistic mouth (e.g., a small line or shape), all with a sketch-like texture.
+   - Apply a strong retro glitch effect and pixelated texture to the entire image, mimicking a corrupted digital sketch.
+   - The skin tone should match the "skin" or "Race" trait value (e.g., "tan"), rendered with sketch shading.
+   - The overall aesthetic should be cute yet slightly rebellious, with a hand-drawn, unfinished look.
 
-Art Style: Stylized cartoon avatar with vibrant colors, bold outlines, and exaggerated features typical of high-quality cartoon PFPs (e.g., similar to modern NFT avatars or anime-inspired characters). The avatar must have a distinctly animated, non-human appearance with clean lines, simplified textures, and a whimsical vibe suitable for a lighthearted audience. Ensure each generated avatar has unique characteristics to avoid repetition in appearance.
+2. **Interpret JSON Traits:**
+   - Parse the JSON input to extract each trait and its corresponding value.
+   - Apply each trait to the character design as follows:
+     - **Background:** Set the background scene (e.g., "roadside" should depict a road with a horizon and some roadside elements like signs or grass, drawn with sketch lines and glitch effects).
+     - **Race/Skin:** Adjust the character's skin tone (e.g., "tan" for a medium tan shade, with sketch shading).
+     - **Hat:** Add the specified hat (e.g., "Alien Hat" should be a quirky, sci-fi-themed hat with antennae or glowing elements, drawn as a blocky sketch).
+     - **Glasses:** Include the specified glasses (e.g., "Harajuku Glasses" should be colorful, oversized, and trendy, with a sketchy design).
+     - **Face:** Apply the facial expression or style (e.g., "big blush" adds large pink blush marks on the cheeks, drawn with rough lines).
+     - **Eyes:** Modify the eye shape (e.g., "Dilated" means larger pupils with a slightly dazed look, sketch-style).
+     - **Eye color:** Set the eye color (e.g., "Brown" for brown eyes, with sketch shading).
+     - **Necklace:** Add the necklace (e.g., "evil eye necklace" should be a blue and white amulet on a chain, drawn as a blocky sketch).
+     - **Shirt:** Dress the character in the specified shirt (e.g., "cardigan tee" is a casual tee with a cardigan over it, low-poly and sketch-like).
+     - **Hair:** Style the hair (e.g., "og frosted blonde" should be a blonde afro with frosted tips, drawn with blocky, sketch lines).
+     - **Eyebrows/Brows:** Adjust the eyebrows (e.g., "concernedb" for concerned eyebrows, "flat" for straight, neutral brows, sketch-style).
+     - **Mouth:** Set the mouth expression (e.g., "smilec" for a small, cute smile, drawn with rough lines).
+     - **Weapon:** Include the weapon as an accessory (e.g., "Super Soaker" is a colorful water gun held in hand, blocky and sketch-like).
+     - **Costume:** If a costume is specified, overlay it on the character (e.g., "Nun" adds a nun's habit over the existing outfit, low-poly sketch).
+     - **Earring:** Add the earring (e.g., "dual rings silver" means two silver hoop earrings, drawn as a blocky sketch).
+     - **Neck:** Add neck details (e.g., "Lean Neck Tattoo" adds a small, edgy tattoo on the neck, sketch-style).
+     - **Face Decoration:** Include facial details (e.g., "star heart tattoo" adds a small star and heart tattoo on the face, drawn with rough lines).
+     - **Core:** Reflect the core style in the overall vibe (e.g., "harajuku" emphasizes bright colors and trendy accessories, sketch-like).
+     - **Drip Score/Drip Grade:** Use these to influence the overall "coolness" factor (e.g., "42" and "s-drip" mean the character should look very stylish and high-fashion, with sketch emphasis).
 
-Gender Representation:
-- If Gender is "female": Emphasize traditionally feminine traits such as softer facial features (e.g., larger eyes with longer lashes, rounded jawline), and more delicate styling in hair and clothing (e.g., bows, frilled clothing edges). Use brighter or pastel color palettes where appropriate.
-- If Gender is "male": Emphasize traditionally masculine traits such as sharper facial features (e.g., angular jawline, smaller eyes with thicker eyebrows), and more rugged styling in hair and clothing (e.g., short hair, bolder patterns). Use darker or more neutral color palettes where appropriate.
-- If Gender is "neutral": Use a balanced mix of features, avoiding overly feminine or masculine traits (e.g., medium-sized eyes, neutral jawline, unisex clothing styles). Use a versatile color palette that avoids strong gender stereotypes.
-- Ensure the specified gender "${gender}" is clearly reflected in the avatar's design through these visual cues.
+3. **Styling and Details:**
+   - Ensure the character's outfit and accessories align with the "Core" trait (e.g., "harajuku" style should be vibrant and eclectic, drawn with sketch lines).
+   - Use bold, contrasting colors with a hand-drawn, sketch-like texture for clothing and accessories.
+   - Add small details to enhance the personality (e.g., a mischievous glint in the eyes for an "s-drip" character, rendered as a sketch).
+   - Maintain the retro glitch effect and sketch-like quality throughout all elements.
 
-Expression: Randomize the expression to convey a playful mood. Options include: shy and slightly embarrassed (small, closed-mouth smile, wide eyes with a hint of nervousness, cartoon-style sweat drops), cheerful (big smile, sparkling eyes), or mischievous (smirking with one eye winking). Ensure the expression aligns with the playful vibe and complements the specified gender.
+4. **Background and Composition:**
+   - Place the character in the specified background (e.g., "roadside" with a road, sky, and distant buildings, drawn with sketch lines and glitch effects).
+   - Ensure the background complements the character without overpowering them, keeping the sketch aesthetic.
+   - Apply a retro glitch effect and pixelated texture to the background.
 
-Eyes: Large, stylized eyes with thick outlines, bold white highlights, and a shiny, animated look to emphasize the cartoon aesthetic. Randomize the eye color between black, brown, blue, or green, and adjust the eye shape slightly (e.g., rounded for female, almond-shaped for male, or neutral for non-binary) to reflect the gender and enhance the chosen expression.
+5. **Final Touches:**
+   - Apply a subtle watermark in the bottom corner with "MAKER.REMILIA.ORG", drawn with sketch lines.
+   - If the JSON includes a "Drip Grade" like "s-drip," add a small badge or text in the corner saying "UNREGISTERED HYPERCAM 2" in a pixelated, sketch-style font.
 
-Hair: Randomize the hair style and color for variety, while aligning with the specified gender. 
-- For "female": Options include two pigtails, a single ponytail, loose wavy hair, or long bangs, with colors like black, brown, blonde, pink, or purple.
-- For "male": Options include short spiky hair, a side part, or a short messy cut, with colors like black, brown, blonde, blue, or green.
-- For "neutral": Options include a medium-length bob, tousled hair, or a single braid, with colors like black, brown, blonde, teal, or silver.
-- Ensure the hair design enhances the cartoon style, uses bold highlights, simplified shading, and varies between generations.
+**JSON Traits Input:**
+${JSON.stringify(traits, null, 2)}
 
-Skin Tone: Randomize the skin tone between pale, medium, or tan complexion, using smooth, vibrant cartoon shading (e.g., flat colors with subtle gradients). Add a quirky detail like a small cross-shaped mark, freckles, or a star-shaped mark on the cheek for a playful appearance, ensuring it aligns with the gender (e.g., star for female, freckles for male, cross for neutral).
-
-Clothing: Randomize the clothing style while keeping it modern and casual in a simplified cartoon design with bold outlines and minimal texture details, reflecting the specified gender.
-- For "female": Options include a dark-colored collared shirt with frilled edges, a graphic tee with a floral pattern, or a pastel hoodie (e.g., pink, lavender).
-- For "male": Options include a dark-colored collared shirt with a bold stripe, a graphic tee with a geometric pattern, or a rugged hoodie (e.g., navy, green).
-- For "neutral": Options include a simple collared shirt, a graphic tee with a minimalist design, or a hoodie in a neutral color (e.g., gray, white).
-- Ensure the clothing aligns with a whimsical, approachable character and varies between generations.
-
-Accessories:
-- Hat: Trucker-style cap in ${hatColor}, featuring a mesh back and a prominent front panel. The inscription "${inscription}" must be displayed in its entirety on the front panel in a bold, legible font. Use a high-contrast color (e.g., black font for light hats, white font for dark hats) to ensure readability. Adjust the font size dynamically to fit the entire inscription without truncation, distortion, or partial rendering. If the inscription is longer than 10 characters, wrap the text across multiple lines (up to 2 lines) to ensure all characters are visible, maintaining even spacing and centering the text on the front panel. For example, an inscription like "PUMP ZULLE NOW" should be fully displayed, potentially as "PUMP ZULLE" on the first line and "NOW" on the second line, depending on length. Ensure the text occupies the majority of the front panel, is clear, and remains undistorted regardless of the inscription length.
-- Random Accessory: Include one randomized accessory to add variety, aligning with the gender. 
-  - For "female": Options include a cartoon-style safety pin near the hair, small star-shaped earrings, or a tiny bow on the hair.
-  - For "male": Options include a small stud earring, a wristband, or a tiny scarf around the neck.
-  - For "neutral": Options include a simple choker necklace, a minimalist pin on the shirt, or a hair clip.
-  - Use simplified designs and bold outlines to enhance the quirky aesthetic.
-
-Background:
-- Solid black backdrop with minimal digital glitch effects and faint, floating pixel particles in soft sky-blue (#5CEFFF) tones to evoke a modern, digital aesthetic.
-- Ensure the background remains understated, keeping the avatar as the focal point without distracting from the character or hat.
-
-Critical Requirements:
-- The avatar must be a stylized cartoon with exaggerated, animated features (e.g., large eyes, bold outlines, vibrant colors), explicitly avoiding any hyper-realistic human traits such as photorealistic skin textures or lifelike proportions.
-- Use a style similar to modern NFT avatars or anime-inspired characters to ensure a distinctly cartoonish appearance, but ensure each avatar is visually distinct by randomizing features like hair, expression, clothing, and accessories.
-- The hat inscription must exactly match "${inscription}" in its entirety, displayed prominently and legibly on the trucker hat’s front panel with no truncation, distortion, or partial rendering. For longer inscriptions, wrap the text across multiple lines as needed to ensure full visibility.
-- Exclude any additional logos, characters, or text beyond the specified inscription.
-- Ensure the composition prioritizes the avatar’s face and hat, with the background enhancing but not overpowering the subject.
-- Ensure the avatar's gender "${gender}" is accurately represented through clear visual cues in facial features, hair, clothing, and accessories.
+**Output:**
+Generate a digital image of the character with all traits applied, ensuring the style matches the Milady and Remilio aesthetic with a blocky, low-poly, hand-drawn sketch design and a strong retro glitch effect. Avoid smooth 3D renders or polished cartoon looks; focus on a rough, artist sketch vibe. Do not describe the image in text; only produce the visual output.
 `.trim();
 
   let filePath, watermarkedFilePath;
@@ -311,17 +315,17 @@ Critical Requirements:
     const lastItem = await GalleryItem.findOne().sort({ id: -1 });
     const nextId = lastItem ? lastItem.id + 1 : 1;
 
-    const newItem = await GalleryItem.create({
-      id: nextId,
-      username: username,
-      inscription: inscription,
-      imageUrl: uploadResult.secure_url,
-    });
+    // const newItem = await GalleryItem.create({
+    //   id: nextId,
+    //   username: username,
+    //   inscription: traits.find(t => t.trait_type === "hat" || t.trait_type === "Hat")?.value || "Custom",
+    //   imageUrl: uploadResult.secure_url,
+    // });
 
     res.json({
       imageUrl: uploadResult.secure_url,
       message: "Image generated, watermarked, and saved.",
-      galleryItem: newItem,
+      // galleryItem: newItem,
     });
 
   } catch (err) {
